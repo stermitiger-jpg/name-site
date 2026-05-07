@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestionnaire CRUD - Application Simple</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+            padding: 30px;
+        }
+
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+        }
+
+        /* Formulaire d'ajout */
+        .form-section {
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #333;
+            font-weight: bold;
+        }
+
+        input, textarea {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        input:focus, textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        button {
+            background-color: #667eea;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: transform 0.2s, background-color 0.2s;
+        }
+
+        button:hover {
+            background-color: #5a67d8;
+            transform: translateY(-2px);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .btn-supprimer {
+            background-color: #f56565;
+        }
+
+        .btn-supprimer:hover {
+            background-color: #e53e3e;
+        }
+
+        .btn-modifier {
+            background-color: #48bb78;
+        }
+
+        .btn-modifier:hover {
+            background-color: #38a169;
+        }
+
+        .btn-annuler {
+            background-color: #a0aec0;
+        }
+
+        /* Liste des éléments */
+        .items-list {
+            margin-top: 20px;
+        }
+
+        .item-card {
+            background-color: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 15px;
+            transition: box-shadow 0.3s;
+        }
+
+        .item-card:hover {
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .item-title {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #2d3748;
+            margin-bottom: 5px;
+        }
+
+        .item-description {
+            color: #718096;
+            margin-bottom: 10px;
+        }
+
+        .item-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #a0aec0;
+        }
+
+        /* Statistiques */
+        .stats {
+            background-color: #edf2f7;
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 20px;
+            text-align: center;
+            color: #4a5568;
+        }
+
+        /* Mode édition */
+        .editing {
+            background-color: #fef5e7;
+            border-left: 4px solid #f59e0b;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 15px;
+            }
+            
+            .item-actions {
+                flex-direction: column;
+            }
+            
+            button {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📝 Gestionnaire de Tâches</h1>
+        <p class="subtitle">CRUD complet avec sauvegarde locale</p>
+
+        <!-- Formulaire d'ajout/modification -->
+        <div class="form-section">
+            <h2 id="form-title">➕ Ajouter une tâche</h2>
+            <form id="item-form">
+                <div class="form-group">
+                    <label for="title">Titre *</label>
+                    <input type="text" id="title" required placeholder="Entrez le titre...">
+                </div>
+                <div class="form-group">
+                    <label for="description">Description</label>
+                    <textarea id="description" placeholder="Entrez la description..."></textarea>
+                </div>
+                <div class="form-group">
+                    <button type="submit" id="submit-btn">Ajouter</button>
+                    <button type="button" id="cancel-btn" class="btn-annuler" style="display:none;">Annuler</button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Liste des éléments -->
+        <div class="items-list" id="items-list">
+            <!-- Les éléments seront ajoutés ici dynamiquement -->
+        </div>
+
+        <!-- Statistiques -->
+        <div class="stats" id="stats">
+            Total: 0 élément(s)
+        </div>
+    </div>
+
+    <script>
+        // Clé pour le localStorage
+        const STORAGE_KEY = 'crud_items';
+        
+        // État global
+        let items = [];
+        let editingId = null;
+
+        // Éléments DOM
+        const form = document.getElementById('item-form');
+        const titleInput = document.getElementById('title');
+        const descriptionInput = document.getElementById('description');
+        const submitBtn = document.getElementById('submit-btn');
+        const cancelBtn = document.getElementById('cancel-btn');
+        const formTitle = document.getElementById('form-title');
+        const itemsList = document.getElementById('items-list');
+        const statsDiv = document.getElementById('stats');
+
+        // Charger les données depuis localStorage
+        function loadData() {
+            const saved = localStorage.getItem(STORAGE_KEY);
+            if (saved) {
+                items = JSON.parse(saved);
+            } else {
+                // Données par défaut
+                items = [
+                    { id: Date.now() + 1, title: "Exemple de tâche", description: "Ceci est un exemple. Vous pouvez l'éditer ou le supprimer." },
+                    { id: Date.now() + 2, title: "Essayez les fonctionnalités", description: "Ajoutez, modifiez ou supprimez des tâches. Tout est sauvegardé automatiquement !" }
+                ];
+                saveData();
+            }
+            renderItems();
+        }
+
+        // Sauvegarder dans localStorage
+        function saveData() {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+            updateStats();
+        }
+
+        // Ajouter un élément
+        function addItem(title, description) {
+            const newItem = {
+                id: Date.now(),
+                title: title.trim(),
+                description: description.trim()
+            };
+            items.push(newItem);
+            saveData();
+            renderItems();
+        }
+
+        // Modifier un élément
+        function updateItem(id, title, description) {
+            const index = items.findIndex(item => item.id === id);
+            if (index !== -1) {
+                items[index] = {
+                    ...items[index],
+                    title: title.trim(),
+                    description: description.trim()
+                };
+                saveData();
+                renderItems();
+            }
+        }
+
+        // Supprimer un élément
+        function deleteItem(id) {
+            if (confirm('Êtes-vous sûr de vouloir supprimer cet élément ?')) {
+                items = items.filter(item => item.id !== id);
+                saveData();
+                renderItems();
+                if (editingId === id) {
+                    resetForm();
+                }
+            }
+        }
+
+        // Commencer l'édition
+        function startEdit(id) {
+            const item = items.find(item => item.id === id);
+            if (item) {
+                editingId = id;
+                titleInput.value = item.title;
+                descriptionInput.value = item.description;
+                submitBtn.textContent = 'Modifier';
+                formTitle.textContent = '✏️ Modifier la tâche';
+                cancelBtn.style.display = 'inline-block';
+                
+                // Faire défiler jusqu'au formulaire
+                document.querySelector('.form-section').scrollIntoView({ behavior: 'smooth' });
+            }
+        }
+
+        // Réinitialiser le formulaire
+        function resetForm() {
+            editingId = null;
+            titleInput.value = '';
+            descriptionInput.value = '';
+            submitBtn.textContent = 'Ajouter';
+            formTitle.textContent = '➕ Ajouter une tâche';
+            cancelBtn.style.display = 'none';
+        }
+
+        // Mettre à jour les statistiques
+        function updateStats() {
+            const total = items.length;
+            statsDiv.textContent = `📊 Total: ${total} élément(s)`;
+        }
+
+        // Afficher les éléments dans le DOM
+        function renderItems() {
+            if (items.length === 0) {
+                itemsList.innerHTML = '<div class="empty-state">📭 Aucune tâche pour le moment. Ajoutez-en une !</div>';
+                return;
+            }
+
+            itemsList.innerHTML = items.map(item => `
+                <div class="item-card ${editingId === item.id ? 'editing' : ''}">
+                    <div class="item-title">📌 ${escapeHtml(item.title)}</div>
+                    <div class="item-description">${escapeHtml(item.description) || 'Aucune description'}</div>
+                    <div class="item-actions">
+                        <button onclick="startEdit(${item.id})" class="btn-modifier">✏️ Modifier</button>
+                        <button onclick="deleteItem(${item.id})" class="btn-supprimer">🗑️ Supprimer</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Échapper les caractères HTML pour éviter XSS
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        // Gestionnaire de soumission du formulaire
+        function handleSubmit(e) {
+            e.preventDefault();
+            
+            const title = titleInput.value;
+            const description = descriptionInput.value;
+            
+            if (!title.trim()) {
+                alert('Veuillez entrer un titre !');
+                return;
+            }
+            
+            if (editingId !== null) {
+                // Mode édition
+                updateItem(editingId, title, description);
+                resetForm();
+            } else {
+                // Mode ajout
+                addItem(title, description);
+                resetForm();
+            }
+        }
+
+        // Gestionnaire d'annulation
+        function handleCancel() {
+            resetForm();
+        }
+
+        // Initialisation
+        function init() {
+            loadData();
+            form.addEventListener('submit', handleSubmit);
+            cancelBtn.addEventListener('click', handleCancel);
+        }
+
+        // Démarrer l'application
+        init();
+    </script>
+</body>
+</html>
